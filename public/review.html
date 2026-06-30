@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>确认增强提示词</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="review-page">
+    <main class="review-shell">
+      <section class="review-card">
+        <div class="modal-head">
+          <div>
+            <div class="eyebrow">Prompt Enhancer</div>
+            <h1>确认增强后的提示词</h1>
+          </div>
+          <div id="status-line" class="status-line">加载中...</div>
+        </div>
+
+        <div class="modal-body review-body">
+          <section>
+            <div class="panel-label">原始提示词</div>
+            <pre id="original-prompt" class="prompt-panel"></pre>
+          </section>
+          <section>
+            <div class="panel-label">增强后的提示词（可编辑）</div>
+            <textarea id="enhanced-prompt" class="composer-input review-textarea"></textarea>
+          </section>
+        </div>
+
+        <div class="modal-foot">
+          <div id="enhancer-meta" class="enhancer-meta">确认后才会交给 AI。</div>
+          <div class="modal-actions">
+            <button id="cancel-button" class="ghost-button" type="button">取消本次发送</button>
+            <button id="confirm-button" class="primary-button" type="button">确认并发送给 AI</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/review.js"></script>
+  </body>
+</html>

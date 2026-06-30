@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompt Enhancer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <div>
+            <div class="eyebrow">Prompt Enhancer</div>
+            <h1>会话</h1>
+          </div>
+          <button id="new-session-button" class="ghost-button" type="button">新建</button>
+        </div>
+        <div id="session-list" class="session-list"></div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="main-head">
+          <div>
+            <div class="eyebrow">当前会话</div>
+            <h2 id="session-title">默认会话</h2>
+          </div>
+          <div id="status-line" class="status-line">输入普通消息，或使用 /prompt-enhance 你的问题。</div>
+        </header>
+
+        <section id="message-list" class="message-list"></section>
+
+        <form id="composer-form" class="composer">
+          <label class="composer-label" for="composer-input">消息</label>
+          <textarea
+            id="composer-input"
+            class="composer-input"
+            rows="5"
+            placeholder="输入普通消息，或使用 /prompt-enhance 帮我把这个问题整理成更适合 Agent 执行的提示词"
+          ></textarea>
+          <div class="composer-foot">
+            <div class="command-hint">确认前不会发送原始 /prompt-enhance 命令</div>
+            <button class="primary-button" type="submit">发送</button>
+          </div>
+        </form>
+      </main>
+    </div>
+
+    <div id="enhancer-modal" class="modal hidden" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <div class="eyebrow">Prompt Enhance</div>
+            <h3>增强确认页</h3>
+          </div>
+          <button id="close-modal-button" class="ghost-button" type="button">关闭</button>
+        </div>
+
+        <div class="modal-body">
+          <section>
+            <div class="panel-label">原始问题</div>
+            <pre id="original-prompt" class="prompt-panel"></pre>
+          </section>
+          <section>
+            <div class="panel-label">增强后的 PO</div>
+            <pre id="enhanced-prompt" class="prompt-panel prompt-result"></pre>
+          </section>
+        </div>
+
+        <div class="modal-foot">
+          <div id="enhancer-meta" class="enhancer-meta">正在生成...</div>
+          <div class="modal-actions">
+            <button id="regenerate-button" class="ghost-button" type="button">重新生成</button>
+            <button id="cancel-button" class="ghost-button" type="button">取消并恢复</button>
+            <button id="confirm-button" class="primary-button" type="button">确认发送</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
