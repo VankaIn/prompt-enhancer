@@ -2,6 +2,31 @@
 
 独立的“发送前提示词增强”工作流：用户提交 `/prompt-enhance ...` 或 `$prompt-enhance ...` 后，hook 会拦截本次提交，打开本地网页让你确认增强后的提示词；确认后再把增强提示词交给 AI。
 
+## 一键配置面板
+
+推荐给普通用户：
+
+```bash
+npx -y github:VankaIn/prompt-enhancer
+```
+
+会进入配置面板：
+
+```text
+A) 安装/更新 Claude Code hook（推荐）
+B) 安装/更新 Claude Code hook（本地路径，开发用）
+C) 打印手动配置 JSON
+D) 检查当前配置
+E) 启动本地服务
+Q) 退出
+```
+
+默认回车选 A。它会把稳定的在线 hook 命令写入 `~/.claude/settings.json`：
+
+```bash
+npx -y github:VankaIn/prompt-enhancer hook
+```
+
 ## 用 skills 安装
 
 在线安装：
@@ -57,7 +82,13 @@ node bin/prompt-enhancer.js install
 npx --yes /Users/liangjunjie/orca/projects/prompt-enhancer install
 ```
 
-仓库发布后也可以：
+仓库发布后也可以打开配置面板：
+
+```bash
+npx --yes github:VankaIn/prompt-enhancer
+```
+
+或非交互安装：
 
 ```bash
 npx --yes github:VankaIn/prompt-enhancer install

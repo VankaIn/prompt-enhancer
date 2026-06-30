@@ -24,5 +24,5 @@ test('install merges prompt-enhancer hook into Claude settings', () => {
   const data = JSON.parse(fs.readFileSync(settings, 'utf8'));
   const commands = data.hooks.UserPromptSubmit.flatMap((entry) => entry.hooks.map((hook) => hook.command));
   assert(commands.includes('echo keep'));
-  assert(commands.some((command) => command.includes('prompt-enhancer.js') && command.includes(' hook')));
+  assert(commands.some((command) => command === 'npx -y github:VankaIn/prompt-enhancer hook'));
 });

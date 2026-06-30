@@ -3,23 +3,28 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import readline from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const cliPath = path.join(rootDir, 'bin', 'prompt-enhancer.js');
 const hookPath = path.join(rootDir, 'bin', 'prompt-enhancer-hook.js');
+const onlineHookCommand = 'npx -y github:VankaIn/prompt-enhancer hook';
 
 function usage() {
   console.log(`Usage:
-  prompt-enhancer install [--settings <path>] [--use-npx]
+  prompt-enhancer                 Open setup panel
+  prompt-enhancer install [--settings <path>] [--local]
   prompt-enhancer hook
   prompt-enhancer start
   prompt-enhancer doctor
 
 Examples:
-  node ${path.join(rootDir, 'bin', 'prompt-enhancer.js')} install
-  npx prompt-enhancer install --use-npx`);
+  npx -y github:VankaIn/prompt-enhancer
+  npx -y github:VankaIn/prompt-enhancer install
+  node ${cliPath} install --local`);
 }
 
 function argValue(args, name) {
@@ -41,14 +46,18 @@ function writeJson(file, data) {
   fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
 }
 
-function installClaude(args) {
-  const settingsPath = path.resolve(
-    argValue(args, '--settings') || path.join(os.homedir(), '.claude', 'settings.json')
-  );
-  const useNpx = args.includes('--use-npx');
-  const command = useNpx
-    ? 'npx -y prompt-enhancer hook'
-    : `node ${cliPath} hook`;
+function hookCommand(args = []) {
+  if (args.includes('--local')) return `node ${cliPath} hook`;
+  return argValue(args, '--command') || onlineHookCommand;
+}
+
+function settingsPathFrom(args = []) {
+  return path.resolve(argValue(args, '--settings') || path.join(os.homedir(), '.claude', 'settings.json'));
+}
+
+function installClaude(args = []) {
+  const settingsPath = settingsPathFrom(args);
+  const command = hookCommand(args);
 
   const settings = readJson(settingsPath);
   const hooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {};
@@ -70,7 +79,17 @@ function installClaude(args) {
   settings.hooks = { ...hooks, UserPromptSubmit: cleaned };
   writeJson(settingsPath, settings);
 
-  console.log(`Installed prompt-enhancer hook:\n  ${settingsPath}\n  ${command}`);
+  console.log(`\n✓ Installed prompt-enhancer hook\n  settings: ${settingsPath}\n  command:  ${command}\n`);
+}
+
+function printManualConfig(args = []) {
+  console.log(JSON.stringify({
+    hooks: {
+      UserPromptSubmit: [
+        { hooks: [{ type: 'command', command: hookCommand(args), timeout: 600000 }] },
+      ],
+    },
+  }, null, 2));
 }
 
 function runNode(script, args = []) {
@@ -79,17 +98,59 @@ function runNode(script, args = []) {
 }
 
 function doctor() {
+  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+  const settings = readJson(settingsPath);
+  const userPromptSubmit = settings.hooks?.UserPromptSubmit || [];
+  const installed = JSON.stringify(userPromptSubmit).includes('prompt-enhancer');
   console.log(`root: ${rootDir}`);
   console.log(`hook: ${hookPath}`);
-  console.log(`claude settings: ${path.join(os.homedir(), '.claude', 'settings.json')}`);
+  console.log(`online hook command: ${onlineHookCommand}`);
+  console.log(`claude settings: ${settingsPath}`);
+  console.log(`claude hook installed: ${installed ? 'yes' : 'no'}`);
   console.log(`node: ${process.version}`);
+}
+
+async function menu() {
+  if (!process.stdin.isTTY) {
+    usage();
+    return;
+  }
+
+  console.log('\nPrompt Enhancer Setup');
+  console.log('发送 /prompt-enhance 或 $prompt-enhance 时，先打开网页确认增强提示词，再交给 AI。\n');
+  console.log('A) 安装/更新 Claude Code hook（推荐，在线 npx 命令）');
+  console.log('B) 安装/更新 Claude Code hook（本地路径，开发用）');
+  console.log('C) 打印手动配置 JSON');
+  console.log('D) 检查当前配置');
+  console.log('E) 启动本地服务');
+  console.log('Q) 退出\n');
+
+  const rl = readline.createInterface({ input, output });
+  const answer = (await rl.question('请选择 [A]: ')).trim().toUpperCase() || 'A';
+  rl.close();
+
+  if (answer === 'A') return installClaude([]);
+  if (answer === 'B') return installClaude(['--local']);
+  if (answer === 'C') return printManualConfig([]);
+  if (answer === 'D') return doctor();
+  if (answer === 'E') return runNode(path.join(rootDir, 'server.js'));
+  if (answer === 'Q') return;
+
+  console.log('未知选项。');
+  process.exit(1);
 }
 
 const [command, ...args] = process.argv.slice(2);
 
-switch (command || 'help') {
+switch (command || 'menu') {
+  case 'menu':
+    await menu();
+    break;
   case 'install':
     installClaude(args);
+    break;
+  case 'config':
+    printManualConfig(args);
     break;
   case 'hook':
     runNode(hookPath, args);
