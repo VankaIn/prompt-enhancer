@@ -12,14 +12,15 @@ test('buildFullPrompt includes recent session context', () => {
     ],
   });
 
-  assert.match(output, /\[最近会话上下文\]/);
-  assert.match(output, /\[当前会话\]/);
+  assert.match(output, /\[Recent conversation context\]/);
+  assert.match(output, /\[Current session\]/);
   assert.match(output, /接口 401 了/);
 });
 
-test('createHeuristicEnhancedPrompt keeps original intent', () => {
-  const output = createHeuristicEnhancedPrompt('帮我分析这个页面弹窗为什么不显示');
-  assert.match(output, /【任务目标】/);
-  assert.match(output, /帮我分析这个页面弹窗为什么不显示/);
-  assert.match(output, /【输出要求】/);
+test('createHeuristicEnhancedPrompt keeps UI questions concise and actionable', () => {
+  const output = createHeuristicEnhancedPrompt('帮我看一下，第二个节点不应该会有两个按钮吗?');
+  assert.match(output, /第二个节点/);
+  assert.match(output, /按钮渲染条件/);
+  assert.match(output, /根因/);
+  assert.doesNotMatch(output, /【任务目标】|【执行要求】|请直接处理下面的任务/);
 });
