@@ -1,34 +1,73 @@
 ---
 name: prompt-enhancer
-description: Install and operate a local UserPromptSubmit hook that opens a browser confirmation page, lets the user approve an enhanced prompt, then sends the approved prompt to the AI instead of the raw /prompt-enhance command.
+description: Open a local browser confirmation page to enhance a user prompt before the AI acts on it; also install/configure the prompt-enhancer hook and skill for Claude Code, Codex, or Cursor.
 ---
 
 # prompt-enhancer
 
-Use this skill when the user wants to install, configure, verify, or use the local prompt-enhancer workflow.
+Use this skill when the user invokes `$prompt-enhancer`, asks to enhance a prompt before execution, or asks to install/configure/check the prompt-enhancer workflow.
 
-## What this skill provides
+## Critical behavior when invoked with a task
 
-- A local `UserPromptSubmit` hook.
-- Trigger commands: `/prompt-enhance <prompt>` and `$prompt-enhance <prompt>`.
-- A local browser confirmation page before the prompt reaches the AI.
-- Confirmation sends the enhanced prompt; cancellation blocks the original submission.
+Do **not** execute the user's task directly when this skill is invoked with a normal task/request. The purpose of this skill is to show the enhanced prompt in a browser first.
+
+Instead:
+
+1. Send the user's raw task text to the online CLI and wait for confirmation:
+
+   ```bash
+   npx -y github:VankaIn/prompt-enhancer enhance --prompt '<USER_RAW_TASK>'
+   ```
+
+   For multiline text, avoid shell-quoting problems by using stdin:
+
+   ```bash
+   cat <<'PROMPT' | npx -y github:VankaIn/prompt-enhancer enhance
+   <USER_RAW_TASK>
+   PROMPT
+   ```
+
+2. The command opens a local browser review page. Wait until the user clicks confirm or cancel.
+3. If the command fails, times out, or is canceled, stop and report that the prompt was not sent.
+4. If the command prints an enhanced prompt, treat that printed prompt as the actual user request and only then proceed.
+
+## Trigger commands after hook installation
+
+After the hook is installed, these messages are intercepted before the AI acts:
+
+```text
+/prompt-enhance <prompt>
+$prompt-enhance <prompt>
+$prompt-enhancer <prompt>
+```
+
+The hook opens the same local confirmation page and replaces the original input with the confirmed enhanced prompt.
 
 ## Install / configure
 
-From this skill directory, run:
+For the interactive setup panel, run:
 
 ```bash
-node bin/prompt-enhancer.js
+npx -y github:VankaIn/prompt-enhancer
 ```
 
-The setup panel first lets the user choose what to install: hook + skill, hook only, or skill only. Then it lets the user choose Claude Code, Codex, Cursor, or all agents. Hook entries are merged without deleting existing hooks; skills are installed via `npx skills add`.
+The setup panel first lets the user choose what to install: hook + skill, hook only, or skill only. Then it lets the user choose Claude Code, Codex, Cursor, or all agents.
+
+Non-interactive examples:
+
+```bash
+npx -y github:VankaIn/prompt-enhancer install --agent codex
+npx -y github:VankaIn/prompt-enhancer install --agent codex --component hook
+npx -y github:VankaIn/prompt-enhancer install --agent codex --component skill
+npx -y github:VankaIn/prompt-enhancer install --agent all
+```
+
+Hook entries are merged without deleting existing hooks. Skills are installed via `npx skills add`.
 
 ## Verify
 
 ```bash
-node bin/prompt-enhancer.js doctor
-npm test
+npx -y github:VankaIn/prompt-enhancer doctor
 ```
 
 Hook config targets:
@@ -38,25 +77,3 @@ Hook config targets:
 - Cursor: `~/.cursor/hooks.json`
 
 Skill install target: the selected agent's skill list, usually under `~/.agents/skills/prompt-enhancer`.
-
-## Start manually
-
-Manual start is optional because the hook auto-starts the server when needed.
-
-```bash
-node bin/prompt-enhancer.js start
-```
-
-## Usage
-
-After installing the hook, submit one of these in the AI client:
-
-```text
-/prompt-enhance 帮我看一下这个登录报错
-```
-
-```text
-$prompt-enhance 帮我优化这个接口设计
-```
-
-The hook opens a local review page. The user can edit the enhanced prompt and click confirm. The AI receives the confirmed enhanced prompt, not the original command.

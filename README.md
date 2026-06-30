@@ -1,6 +1,6 @@
 # Prompt Enhancer Hook
 
-独立的“发送前提示词增强”工作流：用户提交 `/prompt-enhance ...` 或 `$prompt-enhance ...` 后，hook 会拦截本次提交，打开本地网页让你确认增强后的提示词；确认后再把增强提示词交给 AI。
+独立的“发送前提示词增强”工作流：用户提交 `/prompt-enhance ...`、`$prompt-enhance ...` 或 `$prompt-enhancer ...` 后，hook 会拦截本次提交，打开本地网页让你确认增强后的提示词；确认后再把增强提示词交给 AI。
 
 ## 一键配置面板
 
@@ -50,17 +50,13 @@ npx skills add https://github.com/VankaIn/prompt-enhancer --skill prompt-enhance
 npx skills add /Users/liangjunjie/orca/projects/prompt-enhancer --skill prompt-enhancer
 ```
 
-注意：`skills add` 只安装 skill，不会自动改 hook。安装后在 AI 客户端里说：
+注意：`skills add` 只安装 skill，不会自动改 hook。安装后可以在 AI 客户端里说：
 
 ```text
 使用 prompt-enhancer skill 帮我安装 hook
 ```
 
-或者进入安装后的 skill 目录，手动执行：
-
-```bash
-node bin/prompt-enhancer.js install --agent claude
-```
+如果你直接用 `$prompt-enhancer <任务>` 调用 skill，skill 会先运行在线 CLI 打开确认页，确认后才按增强提示词继续执行。
 
 ## 启动
 
@@ -163,9 +159,15 @@ npx github:VankaIn/prompt-enhancer doctor
 $prompt-enhance 帮我优化这个接口设计
 ```
 
+或：
+
+```text
+$prompt-enhancer 帮我优化这个接口设计
+```
+
 流程：
 
-1. hook 拦截原始消息。
+1. hook 拦截原始消息；如果是 `$prompt-enhancer` skill 调用，则 skill 先调用 `npx -y github:VankaIn/prompt-enhancer enhance`。
 2. 打开本地确认页。
 3. 你可以检查/编辑增强后的提示词。
 4. 点“确认并发送给 AI”。

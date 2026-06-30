@@ -101,6 +101,23 @@ async function waitForDecision(requestId) {
   return null;
 }
 
+export async function confirmPrompt(originalPrompt, promptToEnhance) {
+  await ensureServer();
+  const created = await postJson(`${baseUrl}/api/confirmations`, {
+    originalPrompt,
+    promptToEnhance,
+  });
+
+  openBrowser(created.reviewUrl);
+  const decision = await waitForDecision(created.request.id);
+  if (!decision) throw new Error('提示词增强确认超时，本次消息未发送。');
+  if (decision.status !== 'confirmed') throw new Error('已取消提示词增强，本次消息未发送。');
+
+  const enhancedPrompt = String(decision.enhancedPrompt || '').trim();
+  if (!enhancedPrompt) throw new Error('增强后的提示词为空。');
+  return enhancedPrompt;
+}
+
 async function main() {
   const originalPrompt = extractPrompt(readStdin()).trim();
   if (!originalPrompt) return;
@@ -112,24 +129,7 @@ async function main() {
     return;
   }
 
-  await ensureServer();
-  const created = await postJson(`${baseUrl}/api/confirmations`, {
-    originalPrompt,
-    promptToEnhance: parsed.promptToEnhance,
-  });
-
-  openBrowser(created.reviewUrl);
-  const decision = await waitForDecision(created.request.id);
-  if (!decision) {
-    block('提示词增强确认超时，本次消息未发送。');
-    return;
-  }
-  if (decision.status !== 'confirmed') {
-    block('已取消提示词增强，本次消息未发送。');
-    return;
-  }
-
-  const enhancedPrompt = String(decision.enhancedPrompt || '').trim();
+  const enhancedPrompt = await confirmPrompt(originalPrompt, parsed.promptToEnhance);
   hookOutput({
     hookSpecificOutput: {
       hookEventName: 'UserPromptSubmit',

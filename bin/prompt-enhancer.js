@@ -7,6 +7,8 @@ import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { confirmPrompt } from './prompt-enhancer-hook.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const cliPath = path.join(rootDir, 'bin', 'prompt-enhancer.js');
@@ -19,6 +21,7 @@ function usage() {
   prompt-enhancer                 Open setup panel
   prompt-enhancer install [--agent claude|codex|cursor|all] [--component all|hook|skill] [--settings <path>] [--local]
   prompt-enhancer hook
+  prompt-enhancer enhance --prompt <prompt>
   prompt-enhancer start
   prompt-enhancer doctor
 
@@ -26,6 +29,7 @@ Examples:
   npx -y github:VankaIn/prompt-enhancer
   npx github:VankaIn/prompt-enhancer install --agent all
   npx github:VankaIn/prompt-enhancer install --agent codex --component skill
+  npx github:VankaIn/prompt-enhancer enhance --prompt '帮我优化这个任务'
   node ${cliPath} install --local`);
 }
 
@@ -190,6 +194,22 @@ function printManualConfig(args = []) {
   }, null, 2));
 }
 
+async function enhanceOnce(args = []) {
+  const prompt = argValue(args, '--prompt') || argValue(args, '-p') || args.join(' ') || (!process.stdin.isTTY ? fs.readFileSync(0, 'utf8') : '');
+  const cleanPrompt = String(prompt || '').trim();
+  if (!cleanPrompt) {
+    console.error('missing prompt: use --prompt <text>');
+    process.exit(1);
+  }
+  if (process.env.PROMPT_ENHANCER_DRY_RUN_ENHANCE === '1') {
+    console.log(cleanPrompt);
+    return;
+  }
+
+  const enhancedPrompt = await confirmPrompt(cleanPrompt, cleanPrompt);
+  console.log(enhancedPrompt);
+}
+
 function runNode(script, args = []) {
   const result = spawnSync(process.execPath, [script, ...args], { stdio: 'inherit' });
   process.exit(result.status ?? 1);
@@ -265,6 +285,9 @@ switch (command || 'menu') {
     break;
   case 'hook':
     runNode(hookPath, args);
+    break;
+  case 'enhance':
+    await enhanceOnce(args);
     break;
   case 'start':
     runNode(path.join(rootDir, 'server.js'), args);

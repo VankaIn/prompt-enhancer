@@ -1,4 +1,4 @@
-const COMMAND_RE = /^\s*(?:\/prompt-enhance|\$prompt-enhance)\b\s*([\s\S]*)$/i;
+const COMMAND_RE = /^\s*(?:\/prompt-enhance|\$prompt-enhance|\$prompt-enhancer)\b\s*([\s\S]*)$/i;
 
 export function parsePromptEnhanceCommand(content) {
   const match = String(content || '').match(COMMAND_RE);

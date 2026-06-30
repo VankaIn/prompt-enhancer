@@ -63,3 +63,13 @@ test('install can install skills only in dry-run mode', () => {
   assert.match(result.stdout, /codex/);
   assert.match(result.stdout, /cursor/);
 });
+
+
+test('enhance command can read prompt without opening browser in dry-run mode', () => {
+  const result = spawnSync(process.execPath, [cli, 'enhance', '帮我', '优化这个任务'], {
+    encoding: 'utf8',
+    env: { ...process.env, PROMPT_ENHANCER_DRY_RUN_ENHANCE: '1' },
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(result.stdout.trim(), '帮我 优化这个任务');
+});
