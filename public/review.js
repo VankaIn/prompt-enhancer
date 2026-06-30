@@ -59,6 +59,9 @@ async function resolve(status) {
   });
   setStatus(status === 'confirm' ? '已确认，可以返回 AI 客户端。' : '已取消，本次不会发送。');
   elements.enhancerMeta.textContent = '这个页面可以关闭了。';
+  // ponytail: window.close() only works for script-opened tabs; some browsers
+  // refuse OS-opened ones, so the "page can be closed" message stays as fallback.
+  setTimeout(() => window.close(), 400);
 }
 
 elements.confirmButton.addEventListener('click', () => resolve('confirm').catch((error) => setStatus(error.message)));
