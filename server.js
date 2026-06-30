@@ -124,7 +124,7 @@ const server = http.createServer(async (request, response) => {
 
   try {
     if (request.method === 'GET' && pathname === '/api/health') {
-      sendJson(response, 200, { ok: true });
+      sendJson(response, 200, { ok: true, app: 'prompt-enhancer', features: ['confirmations'] });
       return;
     }
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const host = process.env.PROMPT_ENHANCER_HOST || '127.0.0.1';
 const port = Number(process.env.PROMPT_ENHANCER_PORT || process.env.PORT || 4173);
-const baseUrl = `http://${host}:${port}`;
+let baseUrl = makeBaseUrl(port);
 const timeoutMs = Number(process.env.PROMPT_ENHANCER_CONFIRM_TIMEOUT_MS || 10 * 60 * 1000);
 
 function readStdin() {
@@ -40,30 +41,65 @@ async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function isServerReady() {
+function makeBaseUrl(serverPort) {
+  return `http://${host}:${serverPort}`;
+}
+
+async function isServerReady(url = baseUrl) {
   try {
-    const response = await fetch(`${baseUrl}/api/health`);
-    return response.ok;
+    const response = await fetch(`${url}/api/health`);
+    const data = await response.json();
+    return response.ok && data.app === 'prompt-enhancer' && data.features?.includes('confirmations');
   } catch {
     return false;
   }
 }
 
-async function ensureServer() {
-  if (await isServerReady()) return;
+async function hasHttpResponse(url = baseUrl) {
+  try {
+    await fetch(`${url}/api/health`);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
+async function freePort() {
+  return await new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once('error', reject);
+    server.listen(0, host, () => {
+      const address = server.address();
+      server.close(() => resolve(address.port));
+    });
+  });
+}
+
+async function startServer(serverPort) {
+  baseUrl = makeBaseUrl(serverPort);
   const child = spawn(process.execPath, [path.join(rootDir, 'server.js')], {
     cwd: rootDir,
     detached: true,
     stdio: 'ignore',
-    env: { ...process.env, HOST: host, PORT: String(port) },
+    env: { ...process.env, HOST: host, PORT: String(serverPort) },
   });
   child.unref();
 
   for (let i = 0; i < 40; i += 1) {
     await sleep(250);
-    if (await isServerReady()) return;
+    if (await isServerReady()) return true;
   }
+  return false;
+}
+
+async function ensureServer() {
+  if (await isServerReady()) return;
+
+  // ponytail: stale 4173 servers from older installs exist; use a free port instead of killing user processes.
+  const firstPort = (await hasHttpResponse()) ? await freePort() : port;
+  if (await startServer(firstPort)) return;
+  if (firstPort !== port && await startServer(port)) return;
+  if (firstPort === port && await startServer(await freePort())) return;
   throw new Error(`prompt-enhancer server not ready: ${baseUrl}`);
 }
 

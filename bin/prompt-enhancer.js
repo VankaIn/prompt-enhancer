@@ -206,8 +206,13 @@ async function enhanceOnce(args = []) {
     return;
   }
 
-  const enhancedPrompt = await confirmPrompt(cleanPrompt, cleanPrompt);
-  console.log(enhancedPrompt);
+  try {
+    const enhancedPrompt = await confirmPrompt(cleanPrompt, cleanPrompt);
+    console.log(enhancedPrompt);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : 'prompt-enhancer failed');
+    process.exit(1);
+  }
 }
 
 function runNode(script, args = []) {
