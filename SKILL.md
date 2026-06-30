@@ -22,7 +22,7 @@ From this skill directory, run:
 node bin/prompt-enhancer.js
 ```
 
-The setup panel lets the user choose Claude Code, Codex, Cursor, or all agents. It merges hook entries without deleting existing hooks.
+The setup panel first lets the user choose what to install: hook + skill, hook only, or skill only. Then it lets the user choose Claude Code, Codex, Cursor, or all agents. Hook entries are merged without deleting existing hooks; skills are installed via `npx skills add`.
 
 ## Verify
 
@@ -31,11 +31,13 @@ node bin/prompt-enhancer.js doctor
 npm test
 ```
 
-Agent config targets:
+Hook config targets:
 
 - Claude Code: `~/.claude/settings.json`
 - Codex: `~/.codex/hooks.json`
 - Cursor: `~/.cursor/hooks.json`
+
+Skill install target: the selected agent's skill list, usually under `~/.agents/skills/prompt-enhancer`.
 
 ## Start manually
 

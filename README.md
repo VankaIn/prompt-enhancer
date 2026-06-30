@@ -13,18 +13,24 @@ npx github:VankaIn/prompt-enhancer
 会进入配置面板：
 
 ```text
+安装内容：
+A) Hook + Skill（推荐，一次装完）
+B) 只安装 Hook（提交前拦截）
+C) 只安装 Skill（$ 补全/说明）
+D) 打印手动配置 JSON
+E) 检查当前配置
+Q) 退出
+
+选择 Agent：
 A) Claude Code
 B) Codex
 C) Cursor
-D) 全部安装/更新
-E) 打印手动配置 JSON
-F) 检查当前配置
-Q) 退出
+D) 全部
 ```
 
-默认回车选 A。选择 D 会同时配置 Claude Code、Codex、Cursor。
+默认回车会走 `Hook + Skill`，再选择具体 Agent。
 
-它会把稳定的在线 hook 命令写入对应 Agent 配置：
+Hook 会把稳定的在线命令写入对应 Agent 配置：
 
 ```bash
 npx -y github:VankaIn/prompt-enhancer hook
@@ -94,14 +100,26 @@ npx github:VankaIn/prompt-enhancer
 或非交互安装：
 
 ```bash
-npx github:VankaIn/prompt-enhancer install --agent claude
+# hook + skill 都装
+npx github:VankaIn/prompt-enhancer install --agent codex
+
+# 只装 hook
+npx github:VankaIn/prompt-enhancer install --agent codex --component hook
+
+# 只装 skill
+npx github:VankaIn/prompt-enhancer install --agent codex --component skill
+
+# 全部 Agent 一次装完
+npx github:VankaIn/prompt-enhancer install --agent all
 ```
 
-它会合并写入对应配置，不会覆盖已有其它 hooks：
+Hook 会合并写入对应配置，不会覆盖已有其它 hooks：
 
 - Claude Code: `~/.claude/settings.json`
 - Codex: `~/.codex/hooks.json`
 - Cursor: `~/.cursor/hooks.json`
+
+Skill 会通过 `npx skills add ... --skill prompt-enhancer` 安装到对应 Agent 的 skill 列表。
 
 可检查配置：
 

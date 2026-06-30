@@ -28,7 +28,7 @@ test('install merges prompt-enhancer hook into Claude settings', () => {
     },
   });
 
-  runInstall(['--settings', settings]);
+  runInstall(['--component', 'hook', '--settings', settings]);
 
   const data = JSON.parse(fs.readFileSync(settings, 'utf8'));
   const commands = data.hooks.UserPromptSubmit.flatMap((entry) => entry.hooks.map((hook) => hook.command));
@@ -38,15 +38,28 @@ test('install merges prompt-enhancer hook into Claude settings', () => {
 
 test('install can write Codex hook format', () => {
   const settings = tmpSettings();
-  runInstall(['--agent', 'codex', '--settings', settings]);
+  runInstall(['--agent', 'codex', '--component', 'hook', '--settings', settings]);
   const data = JSON.parse(fs.readFileSync(settings, 'utf8'));
   assert.equal(data.hooks.UserPromptSubmit[0].hooks[0].command, 'npx -y github:VankaIn/prompt-enhancer hook');
 });
 
 test('install can write Cursor hook format', () => {
   const settings = tmpSettings({ version: 1, hooks: { beforeSubmitPrompt: [{ command: 'echo keep' }] } });
-  runInstall(['--agent', 'cursor', '--settings', settings]);
+  runInstall(['--agent', 'cursor', '--component', 'hook', '--settings', settings]);
   const data = JSON.parse(fs.readFileSync(settings, 'utf8'));
   assert.equal(data.hooks.beforeSubmitPrompt[0].command, 'echo keep');
   assert.equal(data.hooks.beforeSubmitPrompt[1].command, 'npx -y github:VankaIn/prompt-enhancer hook');
+});
+
+
+test('install can install skills only in dry-run mode', () => {
+  const result = spawnSync(process.execPath, [cli, 'install', '--agent', 'all', '--component', 'skill', '--dry-run'], {
+    encoding: 'utf8',
+    env: { ...process.env, PROMPT_ENHANCER_DRY_RUN_SKILLS: '1' },
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /skills add https:\/\/github\.com\/VankaIn\/prompt-enhancer/);
+  assert.match(result.stdout, /claude-code/);
+  assert.match(result.stdout, /codex/);
+  assert.match(result.stdout, /cursor/);
 });

@@ -12,11 +12,12 @@ const rootDir = path.resolve(__dirname, '..');
 const cliPath = path.join(rootDir, 'bin', 'prompt-enhancer.js');
 const hookPath = path.join(rootDir, 'bin', 'prompt-enhancer-hook.js');
 const onlineHookCommand = 'npx -y github:VankaIn/prompt-enhancer hook';
+const skillSource = 'https://github.com/VankaIn/prompt-enhancer';
 
 function usage() {
   console.log(`Usage:
   prompt-enhancer                 Open setup panel
-  prompt-enhancer install [--agent claude|codex|cursor|all] [--settings <path>] [--local]
+  prompt-enhancer install [--agent claude|codex|cursor|all] [--component all|hook|skill] [--settings <path>] [--local]
   prompt-enhancer hook
   prompt-enhancer start
   prompt-enhancer doctor
@@ -24,6 +25,7 @@ function usage() {
 Examples:
   npx -y github:VankaIn/prompt-enhancer
   npx github:VankaIn/prompt-enhancer install --agent all
+  npx github:VankaIn/prompt-enhancer install --agent codex --component skill
   node ${cliPath} install --local`);
 }
 
@@ -126,6 +128,45 @@ function installAgents(agents, args = []) {
   }
 }
 
+function skillAgentName(agent) {
+  if (agent === 'claude' || agent === 'claude-code') return 'claude-code';
+  if (agent === 'codex') return 'codex';
+  if (agent === 'cursor') return 'cursor';
+  throw new Error(`unknown agent: ${agent}`);
+}
+
+function installSkillAgents(agents, args = []) {
+  const selected = agents.includes('all') ? ['claude', 'codex', 'cursor'] : agents;
+  const skillAgents = selected.map(skillAgentName);
+  const command = ['--yes', 'skills', 'add', skillSource, '--skill', 'prompt-enhancer', '-g', '-a', ...skillAgents, '-y'];
+
+  if (args.includes('--dry-run') || process.env.PROMPT_ENHANCER_DRY_RUN_SKILLS === '1') {
+    console.log(`DRY RUN: npx ${command.join(' ')}`);
+    return;
+  }
+
+  const result = spawnSync('npx', command, { stdio: 'inherit' });
+  if ((result.status ?? 1) !== 0) {
+    throw new Error('skills install failed');
+  }
+}
+
+function parseComponent(args = []) {
+  return (argValue(args, '--component') || argValue(args, '-c') || 'all').toLowerCase();
+}
+
+function installSelected(agents, args = []) {
+  const component = parseComponent(args);
+  if (component === 'all') {
+    installAgents(agents, args);
+    installSkillAgents(agents, args);
+    return;
+  }
+  if (component === 'hook') return installAgents(agents, args);
+  if (component === 'skill' || component === 'skills') return installSkillAgents(agents, args);
+  throw new Error(`unknown component: ${component}`);
+}
+
 function parseAgents(args = []) {
   const value = argValue(args, '--agent') || argValue(args, '-a');
   if (!value) return ['claude'];
@@ -168,6 +209,7 @@ function doctor() {
   console.log(`claude code: ${hasPromptEnhancer(claude) ? 'installed' : 'not installed'} (${claude})`);
   console.log(`codex:       ${hasPromptEnhancer(codex) ? 'installed' : 'not installed'} (${codex})`);
   console.log(`cursor:      ${hasPromptEnhancer(cursor) ? 'installed' : 'not installed'} (${cursor})`);
+  console.log(`skill:       ${fs.existsSync(path.join(os.homedir(), '.agents', 'skills', 'prompt-enhancer', 'SKILL.md')) ? 'installed' : 'not installed'} (~/.agents/skills/prompt-enhancer)`);
   console.log(`node: ${process.version}`);
 }
 
@@ -179,25 +221,31 @@ async function menu() {
 
   console.log('\nPrompt Enhancer Setup');
   console.log('发送 /prompt-enhance 或 $prompt-enhance 时，先打开网页确认增强提示词，再交给 AI。\n');
-  console.log('A) Claude Code');
-  console.log('B) Codex');
-  console.log('C) Cursor');
-  console.log('D) 全部安装/更新');
-  console.log('E) 打印手动配置 JSON');
-  console.log('F) 检查当前配置');
+  console.log('安装内容：');
+  console.log('A) Hook + Skill（推荐，一次装完）');
+  console.log('B) 只安装 Hook（提交前拦截）');
+  console.log('C) 只安装 Skill（$ 补全/说明）');
+  console.log('D) 打印手动配置 JSON');
+  console.log('E) 检查当前配置');
   console.log('Q) 退出\n');
 
   const rl = readline.createInterface({ input, output });
-  const answer = (await rl.question('请选择要配置的 Agent [A]: ')).trim().toUpperCase() || 'A';
+  const componentAnswer = (await rl.question('请选择安装内容 [A]: ')).trim().toUpperCase() || 'A';
+  if (componentAnswer === 'D') { rl.close(); return printManualConfig([]); }
+  if (componentAnswer === 'E') { rl.close(); return doctor(); }
+  if (componentAnswer === 'Q') { rl.close(); return; }
+
+  console.log('\n选择 Agent：');
+  console.log('A) Claude Code');
+  console.log('B) Codex');
+  console.log('C) Cursor');
+  console.log('D) 全部');
+  const agentAnswer = (await rl.question('请选择 Agent [A]: ')).trim().toUpperCase() || 'A';
   rl.close();
 
-  if (answer === 'A') return installAgents(['claude'], []);
-  if (answer === 'B') return installAgents(['codex'], []);
-  if (answer === 'C') return installAgents(['cursor'], []);
-  if (answer === 'D') return installAgents(['all'], []);
-  if (answer === 'E') return printManualConfig([]);
-  if (answer === 'F') return doctor();
-  if (answer === 'Q') return;
+  const component = componentAnswer === 'B' ? 'hook' : componentAnswer === 'C' ? 'skill' : 'all';
+  const agents = agentAnswer === 'B' ? ['codex'] : agentAnswer === 'C' ? ['cursor'] : agentAnswer === 'D' ? ['all'] : ['claude'];
+  return installSelected(agents, ['--component', component]);
 
   console.log('未知选项。');
   process.exit(1);
@@ -210,7 +258,7 @@ switch (command || 'menu') {
     await menu();
     break;
   case 'install':
-    installAgents(parseAgents(args), args);
+    installSelected(parseAgents(args), args);
     break;
   case 'config':
     printManualConfig(args);
