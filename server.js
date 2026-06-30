@@ -114,6 +114,7 @@ function buildEnhancerContext(sessionId, body) {
   return {
     sessionTitle: session?.title || '',
     notes: body.notes || '',
+    imagePaths: Array.isArray(body.imagePaths) ? body.imagePaths : [],
     recentMessages: sessionId ? getRecentMessages(sessionId, 6) : [],
   };
 }

@@ -29,6 +29,6 @@ test('createHeuristicEnhancedPrompt keeps UI questions concise and actionable', 
 test('buildCodexCliPrompt uses strict optimizer instructions', () => {
   const output = buildCodexCliPrompt('帮我看一下按钮问题');
   assert.match(output, /Output ONLY the optimized prompt/);
-  assert.match(output, /Match the language/);
+  assert.match(output, /same language/);
   assert.match(output, /帮我看一下按钮问题/);
 });

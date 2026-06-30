@@ -19,14 +19,90 @@ function readStdin() {
   return fs.readFileSync(0, 'utf8');
 }
 
-export function extractPrompt(input) {
+function existingImagePath(value) {
+  if (typeof value !== 'string') return '';
+  const cleaned = value.replace(/^file:\/\//, '');
+  if (!/\.(png|jpe?g|webp|gif)$/i.test(cleaned)) return '';
+  return fs.existsSync(cleaned) ? cleaned : '';
+}
+
+function imagePathsFromText(text) {
+  const paths = [];
+  const source = String(text || '');
+  for (const match of source.matchAll(/<image[^>]*\bpath=["']([^"']+)["'][^>]*>/g)) {
+    const path = existingImagePath(match[1]);
+    if (path) paths.push(path);
+  }
+  for (const match of source.matchAll(/image file:\s*([^\n]+)/gi)) {
+    const path = existingImagePath(match[1].trim());
+    if (path) paths.push(path);
+  }
+  return paths;
+}
+
+function collectImagePaths(value, paths = []) {
+  if (typeof value === 'string') {
+    paths.push(...imagePathsFromText(value));
+    const path = existingImagePath(value);
+    if (path) paths.push(path);
+    return paths;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectImagePaths(item, paths);
+    return paths;
+  }
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) collectImagePaths(item, paths);
+  }
+  return paths;
+}
+
+function readTranscriptImagePaths(file) {
+  if (!file || !fs.existsSync(file)) return [];
+  const lines = fs.readFileSync(file, 'utf8').trim().split('\n').slice(-80).reverse();
+  for (const line of lines) {
+    try {
+      const event = JSON.parse(line);
+      const payload = event.payload || event;
+      const message = payload.payload || payload;
+      if (message?.role === 'user' || message?.type === 'user_message' || message?.type === 'message') {
+        const paths = collectImagePaths(message);
+        if (paths.length) return paths;
+      }
+    } catch {
+      // ignore malformed transcript lines
+    }
+  }
+  return [];
+}
+
+function uniq(items) {
+  return [...new Set(items.filter(Boolean))];
+}
+
+export function extractPromptPayload(input) {
   try {
     const parsed = JSON.parse(input || '{}');
     const message = parsed.message ?? parsed.content ?? parsed.prompt ?? '';
-    return typeof message === 'string' ? message : JSON.stringify(message);
+    const prompt = typeof message === 'string' ? message : JSON.stringify(message);
+    const transcriptPath = parsed.transcript_path || parsed.transcriptPath || parsed.agent_transcript_path;
+    return {
+      prompt,
+      imagePaths: uniq([
+        ...collectImagePaths(parsed),
+        ...readTranscriptImagePaths(transcriptPath),
+      ]),
+    };
   } catch {
-    return input || '';
+    return {
+      prompt: input || '',
+      imagePaths: collectImagePaths(input),
+    };
   }
+}
+
+export function extractPrompt(input) {
+  return extractPromptPayload(input).prompt;
 }
 
 function hookOutput(payload) {
@@ -137,11 +213,12 @@ async function waitForDecision(requestId) {
   return null;
 }
 
-export async function confirmPrompt(originalPrompt, promptToEnhance) {
+export async function confirmPrompt(originalPrompt, promptToEnhance, context = {}) {
   await ensureServer();
   const created = await postJson(`${baseUrl}/api/confirmations`, {
     originalPrompt,
     promptToEnhance,
+    ...context,
   });
 
   openBrowser(created.reviewUrl);
@@ -157,7 +234,8 @@ export async function confirmPrompt(originalPrompt, promptToEnhance) {
 async function main() {
   if (process.env.PROMPT_ENHANCER_SKIP_HOOK === '1') return;
 
-  const originalPrompt = extractPrompt(readStdin()).trim();
+  const payload = extractPromptPayload(readStdin());
+  const originalPrompt = payload.prompt.trim();
   if (!originalPrompt) return;
 
   const parsed = parsePromptEnhanceCommand(originalPrompt);
@@ -167,7 +245,7 @@ async function main() {
     return;
   }
 
-  const enhancedPrompt = await confirmPrompt(originalPrompt, parsed.promptToEnhance);
+  const enhancedPrompt = await confirmPrompt(originalPrompt, parsed.promptToEnhance, { imagePaths: payload.imagePaths });
   hookOutput({
     hookSpecificOutput: {
       hookEventName: 'UserPromptSubmit',
