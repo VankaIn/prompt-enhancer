@@ -7,11 +7,9 @@
     "dev": "node server.js",
     "start": "node server.js",
     "test": "node --test",
-    "hook": "node bin/prompt-enhancer-hook.js",
     "install:claude": "node bin/prompt-enhancer.js install"
   },
   "bin": {
-    "prompt-enhancer": "./bin/prompt-enhancer.js",
-    "prompt-enhancer-hook": "./bin/prompt-enhancer-hook.js"
+    "prompt-enhancer": "./bin/prompt-enhancer.js"
   }
 }

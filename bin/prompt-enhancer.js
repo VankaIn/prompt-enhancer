@@ -7,129 +7,36 @@ import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { confirmPrompt } from './prompt-enhancer-hook.js';
+import { confirmPrompt } from '../lib/confirm-client.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const cliPath = path.join(rootDir, 'bin', 'prompt-enhancer.js');
-const hookPath = path.join(rootDir, 'bin', 'prompt-enhancer-hook.js');
-const onlineHookCommand = 'npx -y github:VankaIn/prompt-enhancer hook';
 const skillSource = 'https://github.com/VankaIn/prompt-enhancer';
 
 function usage() {
   console.log(`Usage:
-  prompt-enhancer                 Open setup panel
-  prompt-enhancer install [--agent claude|codex|cursor|all] [--component all|hook|skill] [--settings <path>] [--local]
-  prompt-enhancer hook
-  prompt-enhancer enhance --prompt <prompt>
+  prompt-enhancer                 Open setup panel (install skill)
+  prompt-enhancer install [--agent claude|codex|cursor|all] [--dry-run]
+  prompt-enhancer confirm --original <text> --enhanced <text>
   prompt-enhancer start
   prompt-enhancer doctor
+
+Notes:
+  Enhancement is done in-session by your AI agent (it has your conversation and
+  project context). 'confirm' only opens the local review page for an already
+  enhanced prompt and prints the confirmed result on stdout.
 
 Examples:
   npx -y github:VankaIn/prompt-enhancer
   npx github:VankaIn/prompt-enhancer install --agent all
-  npx github:VankaIn/prompt-enhancer install --agent codex --component skill
-  npx github:VankaIn/prompt-enhancer enhance --prompt '帮我优化这个任务'
-  node ${cliPath} install --local`);
+  cat enhanced.txt | npx github:VankaIn/prompt-enhancer confirm --original '原始需求'
+  node ${cliPath} install --dry-run`);
 }
 
 function argValue(args, name) {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : null;
-}
-
-function readJson(file) {
-  if (!fs.existsSync(file)) return {};
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch {
-    return {};
-  }
-}
-
-function writeJson(file, data) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
-}
-
-function hookCommand(args = []) {
-  if (args.includes('--local')) return `node ${cliPath} hook`;
-  return argValue(args, '--command') || onlineHookCommand;
-}
-
-function claudeSettingsPath(args = []) {
-  return path.resolve(argValue(args, '--settings') || path.join(os.homedir(), '.claude', 'settings.json'));
-}
-
-function codexHooksPath(args = []) {
-  return path.resolve(argValue(args, '--settings') || path.join(os.homedir(), '.codex', 'hooks.json'));
-}
-
-function cursorHooksPath(args = []) {
-  return path.resolve(argValue(args, '--settings') || path.join(os.homedir(), '.cursor', 'hooks.json'));
-}
-
-function mergeNestedUserPromptHook(file, command) {
-  const settings = readJson(file);
-  const hooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {};
-  const userPromptSubmit = Array.isArray(hooks.UserPromptSubmit) ? hooks.UserPromptSubmit : [];
-
-  const cleaned = userPromptSubmit
-    .map((entry) => ({
-      ...entry,
-      hooks: Array.isArray(entry?.hooks)
-        ? entry.hooks.filter((hook) => !String(hook?.command || '').includes('prompt-enhancer'))
-        : [],
-    }))
-    .filter((entry) => entry.hooks.length > 0 || entry.matcher);
-
-  cleaned.push({ hooks: [{ type: 'command', command, timeout: 600000 }] });
-  settings.hooks = { ...hooks, UserPromptSubmit: cleaned };
-  writeJson(file, settings);
-}
-
-function mergeFlatHook(file, eventName, command) {
-  const settings = readJson(file);
-  const hooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {};
-  const eventHooks = Array.isArray(hooks[eventName]) ? hooks[eventName] : [];
-  hooks[eventName] = [
-    ...eventHooks.filter((hook) => !String(hook?.command || '').includes('prompt-enhancer')),
-    { command, timeout: 600000 },
-  ];
-  settings.version = settings.version || 1;
-  settings.hooks = hooks;
-  writeJson(file, settings);
-}
-
-function installClaude(args = []) {
-  const file = claudeSettingsPath(args);
-  const command = hookCommand(args);
-  mergeNestedUserPromptHook(file, command);
-  console.log(`✓ Claude Code hook installed\n  settings: ${file}\n  command:  ${command}`);
-}
-
-function installCodex(args = []) {
-  const file = codexHooksPath(args);
-  const command = hookCommand(args);
-  mergeNestedUserPromptHook(file, command);
-  console.log(`✓ Codex hook installed\n  settings: ${file}\n  command:  ${command}`);
-}
-
-function installCursor(args = []) {
-  const file = cursorHooksPath(args);
-  const command = hookCommand(args);
-  mergeFlatHook(file, 'beforeSubmitPrompt', command);
-  console.log(`✓ Cursor hook installed\n  settings: ${file}\n  command:  ${command}`);
-}
-
-function installAgents(agents, args = []) {
-  const selected = agents.includes('all') ? ['claude', 'codex', 'cursor'] : agents;
-  for (const agent of selected) {
-    if (agent === 'claude' || agent === 'claude-code') installClaude(args);
-    else if (agent === 'codex') installCodex(args);
-    else if (agent === 'cursor') installCursor(args);
-    else throw new Error(`unknown agent: ${agent}`);
-  }
 }
 
 function skillAgentName(agent) {
@@ -155,60 +62,27 @@ function installSkillAgents(agents, args = []) {
   }
 }
 
-function parseComponent(args = []) {
-  return (argValue(args, '--component') || argValue(args, '-c') || 'all').toLowerCase();
-}
-
-function installSelected(agents, args = []) {
-  const component = parseComponent(args);
-  if (component === 'all') {
-    installAgents(agents, args);
-    installSkillAgents(agents, args);
-    return;
-  }
-  if (component === 'hook') return installAgents(agents, args);
-  if (component === 'skill' || component === 'skills') return installSkillAgents(agents, args);
-  throw new Error(`unknown component: ${component}`);
-}
-
 function parseAgents(args = []) {
   const value = argValue(args, '--agent') || argValue(args, '-a');
   if (!value) return ['claude'];
   return value.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
 }
 
-function printManualConfig(args = []) {
-  const command = hookCommand(args);
-  console.log('Claude Code / Codex hooks.json:');
-  console.log(JSON.stringify({
-    hooks: {
-      UserPromptSubmit: [
-        { hooks: [{ type: 'command', command, timeout: 600000 }] },
-      ],
-    },
-  }, null, 2));
-  console.log('\nCursor ~/.cursor/hooks.json:');
-  console.log(JSON.stringify({
-    version: 1,
-    hooks: { beforeSubmitPrompt: [{ command, timeout: 600000 }] },
-  }, null, 2));
-}
-
-async function enhanceOnce(args = []) {
-  const prompt = argValue(args, '--prompt') || argValue(args, '-p') || args.join(' ') || (!process.stdin.isTTY ? fs.readFileSync(0, 'utf8') : '');
-  const cleanPrompt = String(prompt || '').trim();
-  if (!cleanPrompt) {
-    console.error('missing prompt: use --prompt <text>');
-    process.exit(1);
+async function confirmOnce(args = []) {
+  const original = String(argValue(args, '--original') || argValue(args, '-o') || '').trim();
+  let enhanced = argValue(args, '--enhanced') || argValue(args, '-e');
+  if (!enhanced && !process.stdin.isTTY) {
+    enhanced = fs.readFileSync(0, 'utf8');
   }
-  if (process.env.PROMPT_ENHANCER_DRY_RUN_ENHANCE === '1') {
-    console.log(cleanPrompt);
-    return;
+  enhanced = String(enhanced || '').trim();
+  if (!enhanced) {
+    console.error('missing enhanced prompt: use --enhanced <text> or pipe it on stdin');
+    process.exit(1);
   }
 
   try {
-    const enhancedPrompt = await confirmPrompt(cleanPrompt, cleanPrompt);
-    console.log(enhancedPrompt);
+    const confirmed = await confirmPrompt(original || enhanced, enhanced);
+    console.log(confirmed);
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'prompt-enhancer failed');
     process.exit(1);
@@ -220,22 +94,28 @@ function runNode(script, args = []) {
   process.exit(result.status ?? 1);
 }
 
-function hasPromptEnhancer(file) {
+function readJson(file) {
+  if (!fs.existsSync(file)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function hasPromptEnhancerHook(file) {
   return JSON.stringify(readJson(file)).includes('prompt-enhancer');
 }
 
 function doctor() {
   const claude = path.join(os.homedir(), '.claude', 'settings.json');
-  const codex = path.join(os.homedir(), '.codex', 'hooks.json');
-  const cursor = path.join(os.homedir(), '.cursor', 'hooks.json');
+  const skillDir = path.join(os.homedir(), '.agents', 'skills', 'prompt-enhancer', 'SKILL.md');
   console.log(`root: ${rootDir}`);
-  console.log(`hook: ${hookPath}`);
-  console.log(`online hook command: ${onlineHookCommand}`);
-  console.log(`claude code: ${hasPromptEnhancer(claude) ? 'installed' : 'not installed'} (${claude})`);
-  console.log(`codex:       ${hasPromptEnhancer(codex) ? 'installed' : 'not installed'} (${codex})`);
-  console.log(`cursor:      ${hasPromptEnhancer(cursor) ? 'installed' : 'not installed'} (${cursor})`);
-  console.log(`skill:       ${fs.existsSync(path.join(os.homedir(), '.agents', 'skills', 'prompt-enhancer', 'SKILL.md')) ? 'installed' : 'not installed'} (~/.agents/skills/prompt-enhancer)`);
+  console.log(`skill: ${fs.existsSync(skillDir) ? 'installed' : 'not installed'} (~/.agents/skills/prompt-enhancer)`);
   console.log(`node: ${process.version}`);
+  if (hasPromptEnhancerHook(claude)) {
+    console.log('note: a legacy prompt-enhancer hook is still in ~/.claude/settings.json; it is no longer used and can be removed.');
+  }
 }
 
 async function menu() {
@@ -245,35 +125,24 @@ async function menu() {
   }
 
   console.log('\nPrompt Enhancer Setup');
-  console.log('发送 /prompt-enhance 或 $prompt-enhance 时，先打开网页确认增强提示词，再交给 AI。\n');
-  console.log('安装内容：');
-  console.log('A) Hook + Skill（推荐，一次装完）');
-  console.log('B) 只安装 Hook（提交前拦截）');
-  console.log('C) 只安装 Skill（$ 补全/说明）');
-  console.log('D) 打印手动配置 JSON');
-  console.log('E) 检查当前配置');
-  console.log('Q) 退出\n');
-
-  const rl = readline.createInterface({ input, output });
-  const componentAnswer = (await rl.question('请选择安装内容 [A]: ')).trim().toUpperCase() || 'A';
-  if (componentAnswer === 'D') { rl.close(); return printManualConfig([]); }
-  if (componentAnswer === 'E') { rl.close(); return doctor(); }
-  if (componentAnswer === 'Q') { rl.close(); return; }
-
-  console.log('\n选择 Agent：');
+  console.log('调用 prompt-enhancer skill：AI 会用对话/项目上下文增强提示词，再打开网页确认。\n');
+  console.log('选择 Agent：');
   console.log('A) Claude Code');
   console.log('B) Codex');
   console.log('C) Cursor');
   console.log('D) 全部');
-  const agentAnswer = (await rl.question('请选择 Agent [A]: ')).trim().toUpperCase() || 'A';
+  console.log('E) 检查当前配置');
+  console.log('Q) 退出\n');
+
+  const rl = readline.createInterface({ input, output });
+  const answer = (await rl.question('请选择 [A]: ')).trim().toUpperCase() || 'A';
   rl.close();
 
-  const component = componentAnswer === 'B' ? 'hook' : componentAnswer === 'C' ? 'skill' : 'all';
-  const agents = agentAnswer === 'B' ? ['codex'] : agentAnswer === 'C' ? ['cursor'] : agentAnswer === 'D' ? ['all'] : ['claude'];
-  return installSelected(agents, ['--component', component]);
+  if (answer === 'E') return doctor();
+  if (answer === 'Q') return;
 
-  console.log('未知选项。');
-  process.exit(1);
+  const agents = answer === 'B' ? ['codex'] : answer === 'C' ? ['cursor'] : answer === 'D' ? ['all'] : ['claude'];
+  return installSkillAgents(agents);
 }
 
 const [command, ...args] = process.argv.slice(2);
@@ -283,16 +152,10 @@ switch (command || 'menu') {
     await menu();
     break;
   case 'install':
-    installSelected(parseAgents(args), args);
+    installSkillAgents(parseAgents(args), args);
     break;
-  case 'config':
-    printManualConfig(args);
-    break;
-  case 'hook':
-    runNode(hookPath, args);
-    break;
-  case 'enhance':
-    await enhanceOnce(args);
+  case 'confirm':
+    await confirmOnce(args);
     break;
   case 'start':
     runNode(path.join(rootDir, 'server.js'), args);

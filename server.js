@@ -3,21 +3,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 
-import { enhancePromptRequest } from './lib/prompt-enhancer.js';
 import { createConfirmation, getConfirmation, pruneConfirmations, resolveConfirmation } from './lib/confirmation-store.js';
-import { appendMessage, createSession, getRecentMessages, getSession, listSessions } from './lib/session-store.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const publicDir = path.join(__dirname, 'public');
-const sharedDir = path.join(__dirname, 'shared');
 const port = Number(process.env.PORT || 4173);
 const host = process.env.HOST || '127.0.0.1';
-
-const defaultSession = createSession('默认会话');
-appendMessage(defaultSession.id, {
-  role: 'assistant',
-  content: '输入普通消息会直接进入会话。输入 /prompt-enhance 你的问题，会先打开增强确认页，确认后再发送增强后的提示词。',
-});
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -62,13 +53,11 @@ async function readJsonBody(request) {
 }
 
 function resolveStaticFile(pathname) {
-  const cleanPath = pathname === '/' ? '/index.html' : pathname;
-  const isShared = cleanPath.startsWith('/shared/');
-  const baseDir = isShared ? sharedDir : publicDir;
-  const relativePath = isShared ? cleanPath.slice('/shared/'.length) : cleanPath.slice(1);
-  const fullPath = path.normalize(path.join(baseDir, relativePath));
+  const cleanPath = pathname === '/' ? '/review.html' : pathname;
+  const relativePath = cleanPath.slice(1);
+  const fullPath = path.normalize(path.join(publicDir, relativePath));
 
-  if (!fullPath.startsWith(baseDir)) {
+  if (!fullPath.startsWith(publicDir)) {
     return null;
   }
 
@@ -95,28 +84,8 @@ async function serveStaticFile(requestPath, response) {
   }
 }
 
-function sessionSummary(session) {
-  return {
-    id: session.id,
-    title: session.title,
-    createdAt: session.createdAt,
-    updatedAt: session.updatedAt,
-    messages: session.messages,
-  };
-}
-
 function publicBaseUrl() {
   return `http://${host}:${port}`;
-}
-
-function buildEnhancerContext(sessionId, body) {
-  const session = sessionId ? getSession(sessionId) : null;
-  return {
-    sessionTitle: session?.title || '',
-    notes: body.notes || '',
-    imagePaths: Array.isArray(body.imagePaths) ? body.imagePaths : [],
-    recentMessages: sessionId ? getRecentMessages(sessionId, 6) : [],
-  };
 }
 
 const server = http.createServer(async (request, response) => {
@@ -129,55 +98,24 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    if (request.method === 'GET' && pathname === '/api/sessions') {
-      sendJson(response, 200, {
-        sessions: listSessions().map(sessionSummary),
-      });
-      return;
-    }
-
-    if (request.method === 'POST' && pathname === '/api/sessions') {
-      const body = await readJsonBody(request);
-      const session = createSession(String(body.title || '新会话').trim() || '新会话');
-      sendJson(response, 201, { session });
-      return;
-    }
-
-    const messageRoute = pathname.match(/^\/api\/sessions\/([^/]+)\/messages$/);
-    if (request.method === 'POST' && messageRoute) {
-      const sessionId = decodeURIComponent(messageRoute[1]);
-      const body = await readJsonBody(request);
-      const message = appendMessage(sessionId, {
-        role: body.role || 'user',
-        content: body.content,
-        meta: body.meta || null,
-      });
-
-      if (!message) {
-        sendJson(response, 400, { error: 'invalid message or session' });
-        return;
-      }
-
-      sendJson(response, 201, { message });
-      return;
-    }
-
     if (request.method === 'POST' && pathname === '/api/confirmations') {
       pruneConfirmations();
       const body = await readJsonBody(request);
       const originalPrompt = String(body.originalPrompt || body.prompt || '').trim();
-      const promptToEnhance = String(body.promptToEnhance || body.prompt || '').trim();
-      if (!promptToEnhance) {
-        sendJson(response, 400, { error: 'prompt is required' });
+      const enhancedPrompt = String(body.enhancedPrompt || '').trim();
+      if (!enhancedPrompt) {
+        sendJson(response, 400, { error: 'enhancedPrompt is required' });
         return;
       }
 
-      const context = buildEnhancerContext(body.sessionId, body);
-      const result = await enhancePromptRequest({ prompt: promptToEnhance, context });
+      // The enhancement is produced in-session by the calling Claude; the server
+      // only stores it for display + confirmation. No model call here.
       const confirmation = createConfirmation({
         originalPrompt,
-        promptToEnhance,
-        ...result,
+        promptToEnhance: originalPrompt,
+        enhancedPrompt,
+        provider: 'claude-session',
+        model: 'in-session',
       });
       sendJson(response, 201, {
         request: confirmation,
@@ -218,23 +156,6 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === 'GET' && pathname.startsWith('/review/')) {
       await serveStaticFile('/review.html', response);
-      return;
-    }
-
-    if (request.method === 'POST' && pathname === '/api/enhance') {
-      const body = await readJsonBody(request);
-      const prompt = String(body.prompt || '').trim();
-      if (!prompt) {
-        sendJson(response, 400, { error: 'prompt is required' });
-        return;
-      }
-
-      const context = buildEnhancerContext(body.sessionId, body);
-      const result = await enhancePromptRequest({ prompt, context });
-      sendJson(response, 200, {
-        success: true,
-        ...result,
-      });
       return;
     }
 

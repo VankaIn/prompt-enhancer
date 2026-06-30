@@ -1,68 +1,79 @@
 ---
 name: prompt-enhancer
-description: Open a local browser confirmation page to enhance a user prompt before the AI acts on it; also install/configure the prompt-enhancer hook and skill for Claude Code, Codex, or Cursor.
+description: Enhance a vague user request into a clear, executable task using your conversation and project context, show it in a local browser confirmation page, and only act on the confirmed prompt. Also installs/configures the skill.
 ---
 
 # prompt-enhancer
 
-Use this skill when the user invokes `$prompt-enhancer`, asks to enhance a prompt before execution, or asks to install/configure/check the prompt-enhancer workflow.
+Use this skill when the user invokes `prompt-enhancer` / `$prompt-enhancer`, asks to
+enhance a prompt before execution, or asks to install/configure the workflow.
 
-## Critical behavior when invoked with a task
+## Critical behavior
 
-Do **not** execute the user's task directly when this skill is invoked with a normal task/request. The purpose of this skill is to show the enhanced prompt in a browser first.
+When invoked with a task, do **not** execute the task directly. Your job is to first
+**enhance** the request yourself (you have the context an external model lacks), then
+show it in a browser for confirmation, and only act on the confirmed prompt.
 
-Instead:
+## Process
 
-1. Send the user's raw task text to the online CLI and wait for confirmation:
+### 1. Enhance the prompt (you do this, with context)
 
-   ```bash
-   npx -y github:VankaIn/prompt-enhancer enhance --prompt '<USER_RAW_TASK>'
-   ```
+You are the **Prompt Enhancer**. Turn the user's raw request into a clear, executable
+task. Use everything you can see: the conversation history, open/edited files, the
+project structure, and any attached images.
 
-   For multiline text, avoid shell-quoting problems by using stdin:
+Identify intent, missing details, implicit assumptions, and context clues. Then produce
+an enhanced prompt that covers:
 
-   ```bash
-   cat <<'PROMPT' | npx -y github:VankaIn/prompt-enhancer enhance
-   <USER_RAW_TASK>
-   PROMPT
-   ```
+1. **明确目标** — 具体要实现/排查什么
+2. **技术约束** — 语言、框架、依赖等(从项目上下文推断)
+3. **范围边界** — 做什么、不做什么
+4. **验收标准** — 如何判断完成
+5. **相关上下文** — 涉及的具体文件、模块、函数、API(用名字,别贴整段代码)
 
-2. The command opens a local browser review page. Wait until the user clicks confirm or cancel.
-3. If the command fails, times out, or is canceled, stop and report that the prompt was not sent.
-4. If the command prints an enhanced prompt, treat that printed prompt as the actual user request and only then proceed.
+增强原则:
+- **补全而非改变** — 保留用户原意,只补缺失信息,不要擅自扩大需求。
+- **具体而非泛化** — 用具体文件名/函数名/技术栈替代「这个/这里/这段」之类模糊指代;
+  vague 指代若指向某张图或某个文件,用上下文把它说清楚。
+- **简洁而非冗长** — 输出精炼,别堆无用信息。
+- **可执行而非描述** — 输出是能直接执行的任务,不是需求文档。
+- **同语言** — 增强后的 prompt 必须与用户原文同语言(中文→中文,英文→英文)。
+- 只输出增强后的 prompt 正文,不要加「优化后:」之类前缀、解释或 Markdown 标题。
 
-## Trigger commands after hook installation
+### 2. Open the confirmation page
 
-After the hook is installed, these messages are intercepted before the AI acts:
+Send your enhanced prompt to the local review page and **wait** for the user. Pass the
+enhanced text on stdin (handles multiline safely) and the raw request via `--original`:
 
-```text
-/prompt-enhance <prompt>
-$prompt-enhance <prompt>
-$prompt-enhancer <prompt>
+```bash
+cat <<'ENHANCED' | npx -y github:VankaIn/prompt-enhancer confirm --original '<USER_RAW_TASK>'
+<YOUR_ENHANCED_PROMPT>
+ENHANCED
 ```
 
-The hook opens the same local confirmation page and replaces the original input with the confirmed enhanced prompt.
+The command opens a local browser page showing the original vs. your enhanced prompt,
+then blocks until the user confirms (optionally editing it) or cancels.
+
+### 3. Act on the result
+
+- The command prints the confirmed prompt on stdout → treat **that** as the actual user
+  request and proceed to execute it.
+- The command fails / times out / is canceled (non-zero exit) → stop and report that the
+  prompt was not sent. Do not fall back to the original task.
 
 ## Install / configure
 
-For the interactive setup panel, run:
+Interactive setup:
 
 ```bash
 npx -y github:VankaIn/prompt-enhancer
 ```
 
-The setup panel first lets the user choose what to install: hook + skill, hook only, or skill only. Then it lets the user choose Claude Code, Codex, Cursor, or all agents.
-
-Non-interactive examples:
+Non-interactive (skill is installed via `npx skills add`):
 
 ```bash
-npx -y github:VankaIn/prompt-enhancer install --agent codex
-npx -y github:VankaIn/prompt-enhancer install --agent codex --component hook
-npx -y github:VankaIn/prompt-enhancer install --agent codex --component skill
-npx -y github:VankaIn/prompt-enhancer install --agent all
+npx -y github:VankaIn/prompt-enhancer install --agent claude   # or codex | cursor | all
 ```
-
-Hook entries are merged without deleting existing hooks. Skills are installed via `npx skills add`.
 
 ## Verify
 
@@ -70,10 +81,5 @@ Hook entries are merged without deleting existing hooks. Skills are installed vi
 npx -y github:VankaIn/prompt-enhancer doctor
 ```
 
-Hook config targets:
-
-- Claude Code: `~/.claude/settings.json`
-- Codex: `~/.codex/hooks.json`
-- Cursor: `~/.cursor/hooks.json`
-
-Skill install target: the selected agent's skill list, usually under `~/.agents/skills/prompt-enhancer`.
+Skill install target: the selected agent's skill list, usually under
+`~/.agents/skills/prompt-enhancer`.
