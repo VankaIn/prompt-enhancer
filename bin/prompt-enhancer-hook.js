@@ -155,6 +155,8 @@ export async function confirmPrompt(originalPrompt, promptToEnhance) {
 }
 
 async function main() {
+  if (process.env.PROMPT_ENHANCER_SKIP_HOOK === '1') return;
+
   const originalPrompt = extractPrompt(readStdin()).trim();
   if (!originalPrompt) return;
 
