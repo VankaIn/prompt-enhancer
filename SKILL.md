@@ -19,10 +19,10 @@ Use this skill when the user wants to install, configure, verify, or use the loc
 From this skill directory, run:
 
 ```bash
-node bin/prompt-enhancer.js install
+node bin/prompt-enhancer.js
 ```
 
-This merges a hook entry into `~/.claude/settings.json` without deleting existing hooks.
+The setup panel lets the user choose Claude Code, Codex, Cursor, or all agents. It merges hook entries without deleting existing hooks.
 
 ## Verify
 
@@ -30,6 +30,12 @@ This merges a hook entry into `~/.claude/settings.json` without deleting existin
 node bin/prompt-enhancer.js doctor
 npm test
 ```
+
+Agent config targets:
+
+- Claude Code: `~/.claude/settings.json`
+- Codex: `~/.codex/hooks.json`
+- Cursor: `~/.cursor/hooks.json`
 
 ## Start manually
 

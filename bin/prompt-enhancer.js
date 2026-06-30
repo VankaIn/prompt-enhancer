@@ -16,14 +16,14 @@ const onlineHookCommand = 'npx -y github:VankaIn/prompt-enhancer hook';
 function usage() {
   console.log(`Usage:
   prompt-enhancer                 Open setup panel
-  prompt-enhancer install [--settings <path>] [--local]
+  prompt-enhancer install [--agent claude|codex|cursor|all] [--settings <path>] [--local]
   prompt-enhancer hook
   prompt-enhancer start
   prompt-enhancer doctor
 
 Examples:
   npx -y github:VankaIn/prompt-enhancer
-  npx -y github:VankaIn/prompt-enhancer install
+  npx github:VankaIn/prompt-enhancer install --agent all
   node ${cliPath} install --local`);
 }
 
@@ -51,15 +51,20 @@ function hookCommand(args = []) {
   return argValue(args, '--command') || onlineHookCommand;
 }
 
-function settingsPathFrom(args = []) {
+function claudeSettingsPath(args = []) {
   return path.resolve(argValue(args, '--settings') || path.join(os.homedir(), '.claude', 'settings.json'));
 }
 
-function installClaude(args = []) {
-  const settingsPath = settingsPathFrom(args);
-  const command = hookCommand(args);
+function codexHooksPath(args = []) {
+  return path.resolve(argValue(args, '--settings') || path.join(os.homedir(), '.codex', 'hooks.json'));
+}
 
-  const settings = readJson(settingsPath);
+function cursorHooksPath(args = []) {
+  return path.resolve(argValue(args, '--settings') || path.join(os.homedir(), '.cursor', 'hooks.json'));
+}
+
+function mergeNestedUserPromptHook(file, command) {
+  const settings = readJson(file);
   const hooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {};
   const userPromptSubmit = Array.isArray(hooks.UserPromptSubmit) ? hooks.UserPromptSubmit : [];
 
@@ -72,23 +77,75 @@ function installClaude(args = []) {
     }))
     .filter((entry) => entry.hooks.length > 0 || entry.matcher);
 
-  cleaned.push({
-    hooks: [{ type: 'command', command, timeout: 600000 }],
-  });
-
+  cleaned.push({ hooks: [{ type: 'command', command, timeout: 600000 }] });
   settings.hooks = { ...hooks, UserPromptSubmit: cleaned };
-  writeJson(settingsPath, settings);
+  writeJson(file, settings);
+}
 
-  console.log(`\n✓ Installed prompt-enhancer hook\n  settings: ${settingsPath}\n  command:  ${command}\n`);
+function mergeFlatHook(file, eventName, command) {
+  const settings = readJson(file);
+  const hooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {};
+  const eventHooks = Array.isArray(hooks[eventName]) ? hooks[eventName] : [];
+  hooks[eventName] = [
+    ...eventHooks.filter((hook) => !String(hook?.command || '').includes('prompt-enhancer')),
+    { command, timeout: 600000 },
+  ];
+  settings.version = settings.version || 1;
+  settings.hooks = hooks;
+  writeJson(file, settings);
+}
+
+function installClaude(args = []) {
+  const file = claudeSettingsPath(args);
+  const command = hookCommand(args);
+  mergeNestedUserPromptHook(file, command);
+  console.log(`✓ Claude Code hook installed\n  settings: ${file}\n  command:  ${command}`);
+}
+
+function installCodex(args = []) {
+  const file = codexHooksPath(args);
+  const command = hookCommand(args);
+  mergeNestedUserPromptHook(file, command);
+  console.log(`✓ Codex hook installed\n  settings: ${file}\n  command:  ${command}`);
+}
+
+function installCursor(args = []) {
+  const file = cursorHooksPath(args);
+  const command = hookCommand(args);
+  mergeFlatHook(file, 'beforeSubmitPrompt', command);
+  console.log(`✓ Cursor hook installed\n  settings: ${file}\n  command:  ${command}`);
+}
+
+function installAgents(agents, args = []) {
+  const selected = agents.includes('all') ? ['claude', 'codex', 'cursor'] : agents;
+  for (const agent of selected) {
+    if (agent === 'claude' || agent === 'claude-code') installClaude(args);
+    else if (agent === 'codex') installCodex(args);
+    else if (agent === 'cursor') installCursor(args);
+    else throw new Error(`unknown agent: ${agent}`);
+  }
+}
+
+function parseAgents(args = []) {
+  const value = argValue(args, '--agent') || argValue(args, '-a');
+  if (!value) return ['claude'];
+  return value.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
 }
 
 function printManualConfig(args = []) {
+  const command = hookCommand(args);
+  console.log('Claude Code / Codex hooks.json:');
   console.log(JSON.stringify({
     hooks: {
       UserPromptSubmit: [
-        { hooks: [{ type: 'command', command: hookCommand(args), timeout: 600000 }] },
+        { hooks: [{ type: 'command', command, timeout: 600000 }] },
       ],
     },
+  }, null, 2));
+  console.log('\nCursor ~/.cursor/hooks.json:');
+  console.log(JSON.stringify({
+    version: 1,
+    hooks: { beforeSubmitPrompt: [{ command, timeout: 600000 }] },
   }, null, 2));
 }
 
@@ -97,16 +154,20 @@ function runNode(script, args = []) {
   process.exit(result.status ?? 1);
 }
 
+function hasPromptEnhancer(file) {
+  return JSON.stringify(readJson(file)).includes('prompt-enhancer');
+}
+
 function doctor() {
-  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
-  const settings = readJson(settingsPath);
-  const userPromptSubmit = settings.hooks?.UserPromptSubmit || [];
-  const installed = JSON.stringify(userPromptSubmit).includes('prompt-enhancer');
+  const claude = path.join(os.homedir(), '.claude', 'settings.json');
+  const codex = path.join(os.homedir(), '.codex', 'hooks.json');
+  const cursor = path.join(os.homedir(), '.cursor', 'hooks.json');
   console.log(`root: ${rootDir}`);
   console.log(`hook: ${hookPath}`);
   console.log(`online hook command: ${onlineHookCommand}`);
-  console.log(`claude settings: ${settingsPath}`);
-  console.log(`claude hook installed: ${installed ? 'yes' : 'no'}`);
+  console.log(`claude code: ${hasPromptEnhancer(claude) ? 'installed' : 'not installed'} (${claude})`);
+  console.log(`codex:       ${hasPromptEnhancer(codex) ? 'installed' : 'not installed'} (${codex})`);
+  console.log(`cursor:      ${hasPromptEnhancer(cursor) ? 'installed' : 'not installed'} (${cursor})`);
   console.log(`node: ${process.version}`);
 }
 
@@ -118,22 +179,24 @@ async function menu() {
 
   console.log('\nPrompt Enhancer Setup');
   console.log('发送 /prompt-enhance 或 $prompt-enhance 时，先打开网页确认增强提示词，再交给 AI。\n');
-  console.log('A) 安装/更新 Claude Code hook（推荐，在线 npx 命令）');
-  console.log('B) 安装/更新 Claude Code hook（本地路径，开发用）');
-  console.log('C) 打印手动配置 JSON');
-  console.log('D) 检查当前配置');
-  console.log('E) 启动本地服务');
+  console.log('A) Claude Code');
+  console.log('B) Codex');
+  console.log('C) Cursor');
+  console.log('D) 全部安装/更新');
+  console.log('E) 打印手动配置 JSON');
+  console.log('F) 检查当前配置');
   console.log('Q) 退出\n');
 
   const rl = readline.createInterface({ input, output });
-  const answer = (await rl.question('请选择 [A]: ')).trim().toUpperCase() || 'A';
+  const answer = (await rl.question('请选择要配置的 Agent [A]: ')).trim().toUpperCase() || 'A';
   rl.close();
 
-  if (answer === 'A') return installClaude([]);
-  if (answer === 'B') return installClaude(['--local']);
-  if (answer === 'C') return printManualConfig([]);
-  if (answer === 'D') return doctor();
-  if (answer === 'E') return runNode(path.join(rootDir, 'server.js'));
+  if (answer === 'A') return installAgents(['claude'], []);
+  if (answer === 'B') return installAgents(['codex'], []);
+  if (answer === 'C') return installAgents(['cursor'], []);
+  if (answer === 'D') return installAgents(['all'], []);
+  if (answer === 'E') return printManualConfig([]);
+  if (answer === 'F') return doctor();
   if (answer === 'Q') return;
 
   console.log('未知选项。');
@@ -147,7 +210,7 @@ switch (command || 'menu') {
     await menu();
     break;
   case 'install':
-    installClaude(args);
+    installAgents(parseAgents(args), args);
     break;
   case 'config':
     printManualConfig(args);

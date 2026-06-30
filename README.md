@@ -7,21 +7,24 @@
 推荐给普通用户：
 
 ```bash
-npx -y github:VankaIn/prompt-enhancer
+npx github:VankaIn/prompt-enhancer
 ```
 
 会进入配置面板：
 
 ```text
-A) 安装/更新 Claude Code hook（推荐）
-B) 安装/更新 Claude Code hook（本地路径，开发用）
-C) 打印手动配置 JSON
-D) 检查当前配置
-E) 启动本地服务
+A) Claude Code
+B) Codex
+C) Cursor
+D) 全部安装/更新
+E) 打印手动配置 JSON
+F) 检查当前配置
 Q) 退出
 ```
 
-默认回车选 A。它会把稳定的在线 hook 命令写入 `~/.claude/settings.json`：
+默认回车选 A。选择 D 会同时配置 Claude Code、Codex、Cursor。
+
+它会把稳定的在线 hook 命令写入对应 Agent 配置：
 
 ```bash
 npx -y github:VankaIn/prompt-enhancer hook
@@ -50,7 +53,7 @@ npx skills add /Users/liangjunjie/orca/projects/prompt-enhancer --skill prompt-e
 或者进入安装后的 skill 目录，手动执行：
 
 ```bash
-node bin/prompt-enhancer.js install
+node bin/prompt-enhancer.js install --agent claude
 ```
 
 ## 启动
@@ -67,39 +70,43 @@ npm start
 
 ## 配置 Hook
 
-### 一键配置 Claude Code
+### 非交互配置
 
-本地直接运行：
+本地开发：
 
 ```bash
 cd /Users/liangjunjie/orca/projects/prompt-enhancer
-node bin/prompt-enhancer.js install
+node bin/prompt-enhancer.js install --agent claude
 ```
 
 或者用 npx 风格运行本地包：
 
 ```bash
-npx --yes /Users/liangjunjie/orca/projects/prompt-enhancer install
+npx /Users/liangjunjie/orca/projects/prompt-enhancer install
 ```
 
 仓库发布后也可以打开配置面板：
 
 ```bash
-npx --yes github:VankaIn/prompt-enhancer
+npx github:VankaIn/prompt-enhancer
 ```
 
 或非交互安装：
 
 ```bash
-npx --yes github:VankaIn/prompt-enhancer install
+npx github:VankaIn/prompt-enhancer install --agent claude
 ```
 
-它会合并写入 `~/.claude/settings.json`，不会覆盖已有其它 hooks。
+它会合并写入对应配置，不会覆盖已有其它 hooks：
+
+- Claude Code: `~/.claude/settings.json`
+- Codex: `~/.codex/hooks.json`
+- Cursor: `~/.cursor/hooks.json`
 
 可检查配置：
 
 ```bash
-npx --yes /Users/liangjunjie/orca/projects/prompt-enhancer doctor
+npx github:VankaIn/prompt-enhancer doctor
 ```
 
 ### 手动配置 Codex / 兼容 CCG hooks.json 的客户端
@@ -114,7 +121,7 @@ npx --yes /Users/liangjunjie/orca/projects/prompt-enhancer doctor
         "hooks": [
           {
             "type": "command",
-            "command": "node /Users/liangjunjie/orca/projects/prompt-enhancer/bin/prompt-enhancer.js hook",
+            "command": "npx -y github:VankaIn/prompt-enhancer hook",
             "timeout": 600000
           }
         ]
