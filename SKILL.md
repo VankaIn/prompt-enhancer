@@ -42,9 +42,10 @@ an enhanced prompt that covers:
 Send your enhanced prompt to the local review page and **wait** for the user. Pass the
 enhanced text on stdin (handles multiline safely) and the raw request via `--original`:
 
-> **`--original` 必须逐字复制用户最后一条原始输入**——一个字都不许改、不许纠错、不许规整
-> (包括错别字、语音转文字的谐音字、标点)。这栏是给用户做原文对照的基准,任何清洗都会让对照失真。
-> 只有 stdin 里的增强文本才允许由你改写。
+> **`--original` 优先由 UserPromptSubmit hook 自动以逐字原文填充**(装了 hook 时,confirm 会用
+> hook 落盘的原始字节,忽略你传的值)。你在命令里传的 `--original` 只是**兜底**——仅在没装 hook 的
+> 环境才生效,此时也必须逐字复制用户最后一条原始输入:一个字都不许改、不许纠错、不许规整(含错别字、
+> 谐音字、标点、开头的会话 ID、结尾的 `/skill` 触发词)。只有 stdin 里的增强文本才允许由你改写。
 
 ```bash
 cat <<'ENHANCED' | npx -y github:VankaIn/prompt-enhancer confirm --original '<USER_RAW_TASK>'
