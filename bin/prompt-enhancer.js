@@ -13,7 +13,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const cliPath = path.join(rootDir, 'bin', 'prompt-enhancer.js');
 const skillSource = 'https://github.com/VankaIn/prompt-enhancer';
-const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const npxCommand = 'npx';
+const npxShell = process.platform === 'win32';
 
 function usage() {
   console.log(`Usage:
@@ -57,7 +58,8 @@ function installSkillAgents(agents, args = []) {
     return;
   }
 
-  const result = spawnSync(npxCommand, command, { stdio: 'inherit' });
+  // ponytail: Windows npm shims are .cmd files; cmd.exe is the smallest portable launcher.
+  const result = spawnSync(npxCommand, command, { stdio: 'inherit', shell: npxShell });
   if ((result.status ?? 1) !== 0) {
     const detail = result.error ? `: ${result.error.message}` : `: exit ${result.status ?? 1}`;
     throw new Error(`skills install failed${detail}`);
