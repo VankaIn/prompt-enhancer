@@ -4,6 +4,36 @@
 
 ## 安装
 
+### 前置依赖
+
+- Node.js 18+（包含 `npm` / `npx`）：`node -v && npm -v`
+- Git：`git --version`
+- 一个支持 skills 的 AI 客户端：Claude Code / Codex / Cursor
+- 能打开本地浏览器：macOS 自带 `open`，Windows 自带 `cmd start`，Linux 需要 `xdg-open`
+
+缺哪个就先补哪个：
+
+```bash
+# macOS
+brew install node git
+
+# Windows: 安装 Node.js LTS 和 Git for Windows 后，重开终端
+node -v
+npm -v
+git --version
+
+# Linux
+sudo apt install nodejs npm git xdg-utils
+```
+
+如果安装时报 `skills install failed`，先单独确认 `skills` CLI 可用：
+
+```bash
+npx --yes skills --help
+```
+
+这个命令失败时，通常是 Node/npm/Git 没装好或不在 PATH；修好后重开终端再安装。
+
 交互式：
 
 ```bash

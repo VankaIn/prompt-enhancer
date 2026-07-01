@@ -13,6 +13,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const cliPath = path.join(rootDir, 'bin', 'prompt-enhancer.js');
 const skillSource = 'https://github.com/VankaIn/prompt-enhancer';
+const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
 function usage() {
   console.log(`Usage:
@@ -52,13 +53,14 @@ function installSkillAgents(agents, args = []) {
   const command = ['--yes', 'skills', 'add', skillSource, '--skill', 'prompt-enhancer', '-g', '-a', ...skillAgents, '-y'];
 
   if (args.includes('--dry-run') || process.env.PROMPT_ENHANCER_DRY_RUN_SKILLS === '1') {
-    console.log(`DRY RUN: npx ${command.join(' ')}`);
+    console.log(`DRY RUN: ${npxCommand} ${command.join(' ')}`);
     return;
   }
 
-  const result = spawnSync('npx', command, { stdio: 'inherit' });
+  const result = spawnSync(npxCommand, command, { stdio: 'inherit' });
   if ((result.status ?? 1) !== 0) {
-    throw new Error('skills install failed');
+    const detail = result.error ? `: ${result.error.message}` : `: exit ${result.status ?? 1}`;
+    throw new Error(`skills install failed${detail}`);
   }
 }
 
