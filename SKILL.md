@@ -34,7 +34,6 @@ an enhanced prompt that covers:
 - **具体而非泛化** — 用具体文件名/函数名/技术栈替代「这个/这里/这段」之类模糊指代;
   vague 指代若指向某张图或某个文件,用上下文把它说清楚。
 - **简洁而非冗长** — 输出精炼,别堆无用信息。
-- **可执行而非描述** — 输出是能直接执行的任务,不是需求文档。
 - **同语言** — 增强后的 prompt 必须与用户原文同语言(中文→中文,英文→英文)。
 - 只输出增强后的 prompt 正文,不要加「优化后:」之类前缀、解释或 Markdown 标题。
 
@@ -42,6 +41,10 @@ an enhanced prompt that covers:
 
 Send your enhanced prompt to the local review page and **wait** for the user. Pass the
 enhanced text on stdin (handles multiline safely) and the raw request via `--original`:
+
+> **`--original` 必须逐字复制用户最后一条原始输入**——一个字都不许改、不许纠错、不许规整
+> (包括错别字、语音转文字的谐音字、标点)。这栏是给用户做原文对照的基准,任何清洗都会让对照失真。
+> 只有 stdin 里的增强文本才允许由你改写。
 
 ```bash
 cat <<'ENHANCED' | npx -y github:VankaIn/prompt-enhancer confirm --original '<USER_RAW_TASK>'
