@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -15,6 +16,12 @@ test('install registers the skill via skills add (dry-run)', () => {
   assert.match(result.stdout, /claude-code/);
   assert.match(result.stdout, /codex/);
   assert.match(result.stdout, /cursor/);
+});
+
+test('windows install uses shell instead of npx.cmd shim directly', () => {
+  const source = fs.readFileSync(cli, 'utf8');
+  assert.doesNotMatch(source, /npx\.cmd/);
+  assert.match(source, /shell: npxShell/);
 });
 
 test('confirm requires an enhanced prompt', () => {
